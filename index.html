@@ -47,7 +47,6 @@
     <div class="dropdown">
         <select id="streamSelect" onchange="loadStream()">
             <option value="">Select a Stream</option>
-            <!-- Streams will be populated here -->
         </select>
     </div>
 
@@ -57,25 +56,41 @@
     </video>
 
     <script>
-        
-    // Fetch streams from streams.json
-    fetch('streams.json')
-        .then(response => response.json())
-        .then(data => {
-            const dropdown = document.getElementById('streamSelect');
-            data.forEach(stream => {
-                const option = document.createElement('option');
-                option.value = stream.url;
-                option.text = stream.channel;  // Use the channel name from JSON
-                dropdown.appendChild(option);
+        // Function to load stream into video player
+        function loadStream() {
+            const videoPlayer = document.getElementById('videoPlayer');
+            const videoSource = document.getElementById('videoSource');
+            const selectedStream = document.getElementById('streamSelect').value;
+
+            if (selectedStream) {
+                videoSource.src = selectedStream;
+                videoPlayer.load();
+                videoPlayer.play();
+            }
+        }
+
+        // Fetch streams from streams.json and populate the dropdown
+        fetch('streams.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const dropdown = document.getElementById('streamSelect');
+                data.forEach(stream => {
+                    const option = document.createElement('option');
+                    option.value = stream.url;
+                    option.text = stream.channel;  // Use the channel name from JSON
+                    dropdown.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading the streams:', error);
+                alert('Failed to load streams. Please check if streams.json is accessible.');
             });
-        })
-        .catch(error => {
-            console.error('Error loading the streams:', error);
-        });
+    </script>
 
-
-        // Function to extract the channel name from the URL
-        function extractChannelName(url) {
-            const parts = url.split('/');
-            let channelName = parts[3
+</body>
+</html>
