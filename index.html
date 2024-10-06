@@ -672,35 +672,45 @@
  <!-- Stream options embedded here -->
         </select>
     </div>
+<video id="videoPlayer" controls muted>
+    <source id="videoSource" src="" type="application/vnd.apple.mpegurl">
+    Your browser does not support the video tag.
+</video>
 
-    <video id="videoPlayer" controls muted>
-        <source id="videoSource" src="" type="application/x-mpegURL">
-        Your browser does not support the video tag.
-    </video>
+<select id="streamSelect" onchange="loadStream()">
+    <option value="your_stream_url_1.m3u8">Stream 1</option>
+    <option value="your_stream_url_2.m3u8">Stream 2</option>
+</select>
 
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script>
-        function loadStream() {
-            const video = document.getElementById('videoPlayer');
-            const streamSelect = document.getElementById('streamSelect');
-            const selectedStream = streamSelect.value;
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+    function loadStream() {
+        const video = document.getElementById('videoPlayer');
+        const selectedStream = document.getElementById('streamSelect').value;
 
-            if (Hls.isSupported()) {
-                const hls = new Hls();
-                hls.loadSource(selectedStream);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    video.play();
-                });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // For Safari (and possibly other browsers that support HLS natively)
-                video.src = selectedStream;
+        if (Hls.isSupported() && !/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            // Use HLS.js for non-native browsers (desktop, Chrome on Android)
+            const hls = new Hls({
+                xhrSetup: function(xhr, url) {
+                    // Enable CORS by adding custom headers
+                    xhr.withCredentials = true;
+                    xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
+                }
+            });
+            hls.loadSource(selectedStream);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
                 video.play();
-            } else {
-                alert('Your browser does not support adaptive streaming.');
-            }
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // For Safari and possibly other mobile browsers with native HLS support
+            video.src = selectedStream;
+            video.play();
+        } else {
+            alert('Your browser does not support adaptive streaming.');
         }
-    </script>
+    }
+</script>
 
 </body>
 </html>
