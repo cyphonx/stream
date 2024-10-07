@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M3U8 URL Validator</title>
+    <style>
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+            font-size: 0.8rem;
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: center; 
+        }
+        th { 
+            background-color: #f2f2f2; 
+            cursor: pointer; 
+        }
+        .circle { 
+            width: 20px; 
+            height: 20px; 
+            border-radius: 50%; 
+            display: inline-block; 
+        }
+        .green { 
+            background-color: green; 
+        }
+        .red { 
+            background-color: red; 
+            cursor: pointer; 
+        }
+        #videoPlayer { 
+            width: 25%; 
+        }
+        #dropZone {
+            border: 2px dashed #bbb;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+        }
+        #videoInfo { 
+            margin-top: 20px; 
+            font-size: 14px; 
+        }
+        td.url-column {
+            font-size: 8pt;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <h1>M3U8 URL Validator</h1>
+
+    <!-- Dropzone and File Input -->
+    <div id="dropZone">Drag and drop your file here</div>
+    <input type="file" id="fileInput" multiple>
+    <textarea id="urlInput" rows="5" cols="50" placeholder="Paste URLs here"></textarea>
+    <button onclick="processInput()">Process Input</button>
+
+    <!-- Action buttons -->
+    <button onclick="exportToJson()">Export Valid URLs to JSON</button>
+    <button onclick="checkAllBoxes()">Check All</button>
+    <button onclick="uncheckAllBoxes()">Uncheck All</button>
+    <button onclick="revalidateAll()">Revalidate All</button>
+    <button onclick="removeInvalidRecords()">Remove Invalid Records</button>
+
+    <!-- Table to display results -->
+    <table id="urlTable">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Select</th>
+                <th>Channel Name</th>
+                <th>Country</th>
+                <th>Stream URL</th>
+                <th>Top-level Domain</th>
+                <th>Resolution</th>
+                <th>Bandwidth</th>
+                <th>Codecs</th>
+                <th>Play</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Video player at the bottom -->
+    <video id="videoPlayer" controls muted autoplay></video>
+    <div id="videoInfo"></div>
+
+    <script>
+        let urlsData = [];
+
+        // Handle drop file event
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', event => event.preventDefault());
+        dropZone.addEventListener('drop', event => {
+            event.preventDefault();
+            const files = event.dataTransfer.files;
+            [...files].forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    processFile(e.target.result, file.name);
+                };
+                reader.readAsText(file);
+            });
+        });
+
+        // Handle text input and file input
+        function processInput() {
+            const fileInput = document.getElementById('fileInput').files;
+            const urlInput = document.getElementById('urlInput').value;
+            if (fileInput.length > 0) {
+                [...fileInput].forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = e => processFile(e.target.result, file.name);
+                    reader.readAsText(file);
+                });
+            }
+            if (urlInput.trim()) processFile(urlInput.trim(), 'input');
+        }
+
+        // Process file data (either JSON or plain text)
+        function processFile(data, fileName) {
+            if (fileName.endsWith('.json')) {
+                try {
+                    const jsonData = JSON.parse(data);
+                    jsonData.forEach(item => {
+                        if (!urlsData.some(data => data.url === item.url)) {
+                            urlsData.push(item);
+                            addRowToTable(item);
+                        }
+                    });
+                } catch (e) {
+                    console.error("Invalid JSON format");
+                }
+            } else {
+                parseUrls(data);
+            }
+        }
+
+        // Parse URLs and add them to the table
+        function parseUrls(data) {
+            const lines = data.split('\n');
+            let currentCountry = ''; 
+            lines.forEach(line => {
+                let trimmedLine = line.trim().replace(/(^"|"$)/g, '').replace(/['",]+$/g, '');
+
+                if (trimmedLine.startsWith('http')) {
+                    let url = trimmedLine;
+                    if (url.includes('pluto.tv')) {
+                        url = modifyPlutoTvUrl(url);
+                    }
+                    let channelName = getChannelNameFromUrl(url);
+                    channelName = toTitleCase(channelName);
+
+                    const domain = new URL(url).hostname.replace('www.', '');
+                    const tld = domain.split('.').slice(-2).join('.');
+                    const row = {
+                        channel: channelName || 'N/A',
+                        country: currentCountry || 'N/A',
+                        url: url,
+                        tld: tld
+                    };
+
+                    if (!urlsData.some(data => data.url === row.url)) {
+                        urlsData.push(row);
+                        addRowToTable(row);
+                    }
+                }
+            });
+        }
+
+        // Get channel name based on URL structure
+        function getChannelNameFromUrl(url) {
+            if (url.includes('moveonjoy.com')) {
+                const pathParts = url.split('/');
+                return pathParts[3].replace(/_/g, ' ');
+            } else if (url.includes('bloomberg.com')) {
+                const pathParts = url.split('/');
+                return `Bloomberg ${pathParts[pathParts.length - 1].replace('.m3u8', '')}`;
+            }
+            const pathParts = url.split('/');
+            return pathParts[pathParts.length - 2].replace(/_/g, ' ');
+        }
+
+        // Function to convert string to Title Case
+        function toTitleCase(str) {
+            return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        // Modify Pluto TV URLs: Replace sid with DNT
+        function modifyPlutoTvUrl(url) {
+            const urlObj = new URL(url);
+            urlObj.searchParams.set('sid', 'DNT');
+            return urlObj.toString();
+        }
+
+        // Add each row to the table
+        function addRowToTable(row) {
+            const tableBody = document.querySelector('#urlTable tbody');
+            const newRow = tableBody.insertRow();
+
+            const statusCell = newRow.insertCell();
+            const statusCircle = document.createElement('div');
+            statusCircle.classList.add('circle', 'red');
+            statusCircle.onclick = () => recheckUrl(newRow);
+            statusCell.appendChild(statusCircle);
+
+            const selectCell = newRow.insertCell();
+            const selectCheckbox = document.createElement('input');
+            selectCheckbox.type = 'checkbox';
+            selectCell.appendChild(selectCheckbox);
+
+            const channelCell = newRow.insertCell();
+            channelCell.contentEditable = true;
+            channelCell.textContent = row.channel;
+
+            newRow.insertCell().textContent = row.country;
+
+            const urlCell = newRow.insertCell();
+            urlCell.contentEditable = true;
+            urlCell.classList.add('url-column');
+            urlCell.textContent = row.url;
+
+            newRow.insertCell().textContent = row.tld;
+            newRow.insertCell().textContent = 'N/A';
+            newRow.insertCell().textContent = 'N/A';
+            newRow.insertCell().textContent = 'N/A';
+
+            const playCell = newRow.insertCell();
+            const playButton = document.createElement('button');
+            playButton.textContent = 'Play';
+            playButton.onclick = () => loadStream(newRow);
+            playCell.appendChild(playButton);
+
+            validateUrl(newRow); 
+        }
+
+        // Validate URL using fetch and a hidden video player fallback
+        function validateUrl(row) {
+            const url = row.cells[4].textContent.trim();
+            const statusCircle = row.cells[0].querySelector('.circle');
+            const checkbox = row.cells[1].querySelector('input');
+
+            fetch(url, { method: 'GET' })
+                .then(response => {
+                    if (response.ok) {
+                        statusCircle.classList.remove('red');
+                        statusCircle.classList.add('green');
+                        checkbox.checked = true;
+                        fetchM3U8Details(row, url); 
+                    } else {
+                        loadUrlWithVideoElement(url, statusCircle, checkbox); 
+                    }
+                })
+                .catch(error => {
+                    loadUrlWithVideoElement(url, statusCircle, checkbox); 
+                });
+        }
+
+        function loadUrlWithVideoElement(url, statusCircle, checkbox) {
+            const video = document.createElement('video');
+            video.src = url;
+            video.muted = true;
+            video.autoplay = true;
+            video.style.display = 'none';
+
+            document.body.appendChild(video);
+
+            video.addEventListener('loadeddata', function() {
+                statusCircle.classList.remove('red');
+                statusCircle.classList.add('green');
+                checkbox.checked = true;
+                document.body.removeChild(video);
+            });
+
+            video.addEventListener('error', function() {
+                statusCircle.classList.add('red');
+                checkbox.checked = false;
+                document.body.removeChild(video); 
+            });
+        }
+
+        function fetchM3U8Details(row, url) {
+            fetch(url)
+                .then(response => response.text())
+                .then(data => {
+                    const resolutionMatches = data.match(/RESOLUTION=\d+x\d+/g);
+                    const bandwidthMatches = data.match(/BANDWIDTH=\d+/g);
+                    const codecsMatches = data.match(/CODECS="([^"]+)"/g);
+
+                    row.cells[6].textContent = resolutionMatches ? resolutionMatches.map(r => r.split('=')[1]).join(', ') : 'N/A';
+                    row.cells[7].textContent = bandwidthMatches ? bandwidthMatches.map(b => (parseInt(b.split('=')[1]) / 1000000).toFixed(2) + 'Mb/s').join(', ') : 'N/A';
+                    row.cells[8].textContent = codecsMatches ? codecsMatches.map(c => c.split('"')[1]).join(', ') : 'N/A';
+                });
+        }
+
+        function recheckUrl(row) {
+            validateUrl(row);
+        }
+
+        function loadStream(row) {
+            const videoPlayer = document.getElementById('videoPlayer');
+            const url = row.cells[4].textContent.trim();
+            videoPlayer.src = url;
+
+            const domain = new URL(url).hostname;
+            const fileName = url.split('/').pop();
+            document.getElementById('videoInfo').textContent = `Domain: ${domain}, File: ${fileName}`;
+        }
+
+        function exportToJson() {
+            const validUrls = [];
+            document.querySelectorAll('#urlTable tbody tr').forEach((row) => {
+                const checkbox = row.cells[1].querySelector('input');
+                if (checkbox.checked) {
+                    validUrls.push({
+                        channel: row.cells[2].textContent.trim(),
+                        country: row.cells[3].textContent,
+                        url: row.cells[4].textContent.trim()
+                    });
+                }
+            });
+
+            validUrls.sort((a, b) => a.channel.localeCompare(b.channel));
+
+            const blob = new Blob([JSON.stringify(validUrls, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'valid_urls.json';
+            a.click();
+        }
+
+        function checkAllBoxes() {
+            document.querySelectorAll('#urlTable tbody tr').forEach(row => {
+                row.cells[1].querySelector('input').checked = true;
+            });
+        }
+
+        function uncheckAllBoxes() {
+            document.querySelectorAll('#urlTable tbody tr').forEach(row => {
+                row.cells[1].querySelector('input').checked = false;
+            });
+        }
+
+        function revalidateAll() {
+            document.querySelectorAll('#urlTable tbody tr').forEach(row => {
+                validateUrl(row);
+            });
+        }
+
+        function removeInvalidRecords() {
+            const tableBody = document.querySelector('#urlTable tbody');
+            const rows = Array.from(tableBody.rows);
+            rows.forEach(row => {
+                const statusCircle = row.cells[0].querySelector('.circle');
+                if (statusCircle.classList.contains('red')) {
+                    tableBody.removeChild(row);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
