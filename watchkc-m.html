@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royals & Chiefs Streams</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .video-container {
+            position: relative;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: black;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background-color: black;
+        }
+
+        .mute-button {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        @media screen and (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="video-container">
+            <video id="royals" controls autoplay playsinline muted>
+                <source src="https://turnerlive.warnermediacdn.com/hls/live/2023172/tbseast/slate/VIDEO_0_3564000.m3u8" type="application/x-mpegURL">
+                Your browser does not support the video tag.
+            </video>
+            <button class="mute-button" id="muteRoyals">Unmute</button>
+        </div>
+
+        <div class="video-container">
+            <video id="chiefs" controls autoplay playsinline muted>
+                <source src="https://cvtv.cvalley.net/hls/KMBCABC/KMBCABC.m3u8" type="application/x-mpegURL">
+                Your browser does not support the video tag.
+            </video>
+            <button class="mute-button" id="muteChiefs">Unmute</button>
+        </div>
+    </div>
+
+    <script>
+        const royalsVideo = document.getElementById('royals');
+        const chiefsVideo = document.getElement​⬤
